@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zaxis Worker</title><link rel="stylesheet" href="styles.css"></head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brandmark">Z</div><div><strong>Zaxis Worker</strong><span>LOCAL WEB INTELLIGENCE</span></div></div>
+    <nav id="nav">
+      <button class="nav active" data-page="dashboard">▦ <span>Dashboard</span></button>
+      <button class="nav" data-page="jobs">◫ <span>Jobs</span></button>
+      <button class="nav" data-page="commoncrawl">◎ <span>Common Crawl</span></button>
+      <button class="nav" data-page="results">⌁ <span>Results</span></button>
+      <button class="nav" data-page="logs">≡ <span>Logs</span></button>
+      <button class="nav" data-page="settings">⚙ <span>Settings</span></button>
+    </nav>
+    <div class="side-bottom"><div id="connDot" class="dot"></div><span id="sideStatus">Worker Ready</span><small id="version">v1.0.0</small></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div><h1 id="pageTitle">Dashboard</h1><p id="pageSub">Local worker health, jobs and system activity.</p></div><div class="top-actions"><span class="pill" id="enginePill">Ready</span><button class="btn ghost" id="pauseBtn">Pause</button><button class="btn primary" id="startBtn">Start Worker</button></div></header>
+    <section id="content"></section>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="renderer.js"></script>
+</body></html>
