@@ -1,4 +1,4 @@
-# Zaxis Worker 1.0.0
+# Zaxis Worker 1.1.0
 
 Standalone Windows desktop worker for local Web Intelligence jobs.
 
@@ -31,3 +31,15 @@ After a successful build:
 4. Open **Zaxis Worker.exe**.
 
 No CMD or PowerShell is required to use the application.
+
+## Zaxis server pairing (desktop side complete)
+- Server URL, Worker Name and one-time Pairing Code fields
+- Connect / Test Connection / Disconnect controls
+- Unique persistent Device ID
+- Device token encrypted with Electron/Windows safe storage
+- 15-second heartbeat
+- 8-second remote job polling
+- Remote job accept, progress, result upload, complete and fail callbacks
+- No inbound laptop port required; all connections are outbound HTTPS
+
+The matching server endpoints are implemented in Part 2 on the Zaxis Tools website.
