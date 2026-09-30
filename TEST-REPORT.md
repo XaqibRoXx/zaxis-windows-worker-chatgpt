@@ -1,4 +1,4 @@
-# Zaxis Worker v1.0.0 — Test Report
+# Zaxis Worker v1.0.1 — Test Report
 
 ## Passed in build environment
 - JavaScript syntax checks: PASS
@@ -17,3 +17,12 @@
 
 ## Intentional limitation
 Reverse backlink discovery is not fabricated. Current v1 supports Common Crawl domain capture lookup, exact URL history, and live URL verification. A bulk WAT/link provider is required for real inbound backlink discovery.
+
+## v1.0.1 regression fixes
+- Common Crawl Domain/URL field typing and paste persistence fixed.
+- Periodic state updates no longer destroy active form controls.
+- Job detail view stays open during live state updates.
+- Run Local Job starts/resumes the worker automatically.
+- Pause/stop/cancel now abort active network work with distinct states.
+- Windows startup configuration refreshes when Launch Minimized changes.
+- Added UI regression checks to CI.
