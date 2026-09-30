@@ -133,7 +133,7 @@ ipcMain.handle('worker-action', (_e, action)=>{
 ipcMain.handle('create-job', (_e, input)=>{
   const allowed = ['capture_lookup','url_history','live_verify'];
   if (!allowed.includes(input.type)) throw new Error('Unsupported job type.');
-  const job = store.createJob(input); store.addLog('info','Job',`Queued ${job.type} for ${job.target}`,job.id); broadcast(); engine.pump(); return job;
+  const job = store.createJob(input); store.addLog('info','Job',`Queued ${job.type} for ${job.target}`,job.id); if(!engine.running) engine.start(); else if(engine.paused) engine.resume(); broadcast(); engine.pump(); return job;
 });
 ipcMain.handle('job-action', (_e, {id,action})=>{
   const j = store.getState().jobs.find(x=>x.id===id); if(!j) throw new Error('Job not found');
@@ -145,8 +145,8 @@ ipcMain.handle('job-action', (_e, {id,action})=>{
 ipcMain.handle('get-result', (_e,id)=>store.getResult(id));
 ipcMain.handle('save-settings', (_e, patch)=>{
   const settings = store.updateSettings(patch);
-  if ('startWithWindows' in patch) {
-    try { app.setLoginItemSettings({ openAtLogin: !!patch.startWithWindows, openAsHidden: !!settings.launchMinimized }); } catch {}
+  if ('startWithWindows' in patch || 'launchMinimized' in patch) {
+    try { app.setLoginItemSettings({ openAtLogin: !!settings.startWithWindows, openAsHidden: !!settings.launchMinimized }); } catch {}
   }
   if ('showTrayIcon' in patch) createTray();
   broadcast(); return settings;
