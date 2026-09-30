@@ -28,7 +28,109 @@ function jobs(){setHeader('Jobs','Queued, running, completed and failed local jo
 function results(){setHeader('Results','Inspect and export real worker results.');const done=state.jobs.filter(j=>j.resultFile);return `<div class="card panel"><table class="table"><thead><tr><th>Job</th><th>Target</th><th>Results</th><th>Finished</th><th></th></tr></thead><tbody>${done.map(j=>`<tr><td>${esc(titleType(j.type))}</td><td>${esc(j.target)}</td><td>${j.resultsFound}</td><td>${j.finishedAt?new Date(j.finishedAt).toLocaleString():''}</td><td><button class="btn small" onclick="openJob('${j.id}')">Open</button> <button class="btn small" onclick="exportJob('${j.id}')">Export</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No completed results yet.</td></tr>'}</tbody></table></div>`}
 function logs(){setHeader('Logs','In-app worker, provider, network and error logs.');return `<div class="card panel"><div class="section-head"><div><h2>Activity Logs</h2><p>Newest first</p></div><div class="actions"><button class="btn small" onclick="exportLogs()">Export</button><button class="btn danger small" onclick="clearLogs()">Clear</button></div></div><div>${state.logs.length?state.logs.map(l=>`<div class="log-line"><span>${new Date(l.ts).toLocaleString()}</span><span class="log-level ${esc(l.level)}">${esc(l.level.toUpperCase())}</span><span>${esc(l.source)}</span><span>${esc(l.message)}</span></div>`).join(''):'<div class="empty">No logs.</div>'}</div></div>`}
 function toggle(key,label,desc){const on=!!state.settings[key];return `<div class="toggle-row"><div><b>${label}</b><div class="muted">${desc}</div></div><div class="switch ${on?'on':''}" onclick="toggleSetting('${key}',${!on})"></div></div>`}
-function settings(){setHeader('Settings','Startup, background behavior, resources and local worker preferences.');return `<div class="grid two-col"><div><div class="card panel"><div class="section-head"><div><h2>General</h2><p>Windows startup and background behavior</p></div></div>${toggle('startWithWindows','Start Zaxis Worker with Windows','Launch automatically when you sign in.')}${toggle('launchMinimized','Launch minimized','Start quietly in the background.')}${toggle('runInBackground','Keep running when window is closed','Close button hides to tray instead of stopping.')}${toggle('showTrayIcon','Show system tray icon','Quick access to worker controls.')}${toggle('notifications','Windows notifications','Show job completion and failure alerts.')}${toggle('autoStartWorker','Automatically start worker engine','Engine becomes Ready when the app opens.')}</div><div class="card panel section"><h2 style="margin-top:0">Zaxis Connection</h2><div class="notice">Not connected. Server pairing, device token, heartbeat and remote job queue belong to Part 2.</div><div class="form-grid" style="margin-top:14px"><div class="field"><label>Server</label><input class="input" value="Not connected" disabled></div><div class="field"><label>Device</label><input class="input" value="${esc(state.system.hostname)}" disabled></div></div></div></div><div><div class="card panel"><div class="section-head"><div><h2>Resource Limits</h2><p>Saved for worker scheduling</p></div></div><div class="field"><label>Maximum CPU target</label><select class="select" onchange="saveSetting('cpuLimit',Number(this.value))"><option ${state.settings.cpuLimit===25?'selected':''}>25</option><option ${state.settings.cpuLimit===50?'selected':''}>50</option><option ${state.settings.cpuLimit===75?'selected':''}>75</option><option ${state.settings.cpuLimit===100?'selected':''}>100</option></select></div><div class="field" style="margin-top:12px"><label>RAM limit (GB)</label><select class="select" onchange="saveSetting('ramLimitGb',Number(this.value))"><option ${state.settings.ramLimitGb===1?'selected':''}>1</option><option ${state.settings.ramLimitGb===2?'selected':''}>2</option><option ${state.settings.ramLimitGb===4?'selected':''}>4</option><option ${state.settings.ramLimitGb===8?'selected':''}>8</option></select></div><div class="field" style="margin-top:12px"><label>Concurrent network requests</label><input class="input" type="number" min="1" max="32" value="${state.settings.networkConcurrency}" onchange="saveSetting('networkConcurrency',Number(this.value))"></div><div class="field" style="margin-top:12px"><label>Live verify timeout (ms)</label><input class="input" type="number" min="2000" max="60000" value="${state.settings.verifyTimeoutMs}" onchange="saveSetting('verifyTimeoutMs',Number(this.value))"></div><div class="help">The v1 engine records limits; deeper CPU throttling will be applied to bulk WAT processing when that provider is enabled.</div></div><div class="card panel section"><h2 style="margin-top:0">Local Data</h2><p class="muted">${esc(state.system.dataPath)}</p><button class="btn" onclick="openData()">Open Data Folder</button></div></div></div>`}
+function connectionStatus(){
+  const c=state.connection||{};
+  if(c.status==='connected') return '<span class="status-chip completed">Connected</span>';
+  if(c.status==='connecting') return '<span class="status-chip running">Connecting</span>';
+  if(c.status==='error') return '<span class="status-chip failed">Connection Error</span>';
+  return '<span class="status-chip">Not Connected</span>';
+}
+
+function settings(){
+  setHeader('Settings','Startup, Zaxis connection, resources and local worker preferences.');
+  const conn=state.connection||{};
+  const connected=conn.status==='connected'&&conn.workerId;
+  return `<div class="grid two-col">
+    <div>
+      <div class="card panel">
+        <div class="section-head"><div><h2>General</h2><p>Windows startup and background behavior</p></div></div>
+        ${toggle('startWithWindows','Start Zaxis Worker with Windows','Launch automatically when you sign in.')}
+        ${toggle('launchMinimized','Launch minimized','Start quietly in the background.')}
+        ${toggle('runInBackground','Keep running when window is closed','Close button hides to tray instead of stopping.')}
+        ${toggle('showTrayIcon','Show system tray icon','Quick access to worker controls.')}
+        ${toggle('notifications','Windows notifications','Show job completion and failure alerts.')}
+        ${toggle('autoStartWorker','Automatically start worker engine','Engine becomes Ready when the app opens.')}
+      </div>
+
+      <div class="card panel section">
+        <div class="section-head">
+          <div><h2>Zaxis Connection</h2><p>Pair this Windows worker with your Zaxis Tools website.</p></div>
+          ${connectionStatus()}
+        </div>
+
+        ${connected?`
+          <div class="connection-summary">
+            <div class="metric"><b>${esc(conn.workerName||'Zaxis Worker')}</b><span>Worker name</span></div>
+            <div class="metric"><b>${esc(conn.workerId)}</b><span>Worker ID</span></div>
+            <div class="metric"><b>${esc(conn.deviceId)}</b><span>Device ID</span></div>
+            <div class="metric"><b>${conn.lastHeartbeat?new Date(conn.lastHeartbeat).toLocaleString():'Waiting…'}</b><span>Last heartbeat</span></div>
+          </div>
+          <div class="field" style="margin-top:14px"><label>Zaxis Server</label><input class="input" value="${esc(conn.serverUrl)}" disabled></div>
+          ${conn.lastError?`<div class="notice warn" style="margin-top:12px">${esc(conn.lastError)}</div>`:''}
+          <div class="actions" style="margin-top:14px">
+            <button class="btn" onclick="testZaxisConnection()">Test Connection</button>
+            <button class="btn danger" onclick="disconnectZaxis()">Disconnect</button>
+          </div>
+        `:`
+          <div class="notice">
+            In Zaxis Admin open <b>Web Intelligence → Workers → Add Worker</b>, generate a one-time pairing code, then enter it here.
+          </div>
+          ${conn.lastError?`<div class="notice warn" style="margin-top:10px">${esc(conn.lastError)}</div>`:''}
+          <div class="form-grid" style="margin-top:14px">
+            <div class="field">
+              <label>Zaxis Server URL</label>
+              <input id="zaxisServerUrl" class="input" autocomplete="off" spellcheck="false" value="${esc(conn.serverUrl||'https://zaxismedia.vercel.app')}" placeholder="https://your-tools-domain.com">
+            </div>
+            <div class="field">
+              <label>Worker Name</label>
+              <input id="zaxisWorkerName" class="input" autocomplete="off" value="${esc(conn.workerName||state.system.hostname)}" placeholder="Saqib Laptop Worker">
+            </div>
+            <div class="field">
+              <label>Pairing Code</label>
+              <input id="zaxisPairingCode" class="input code-input" autocomplete="off" spellcheck="false" placeholder="ZAXIS-XXXX-XXXX">
+              <div class="help">This one-time code will be generated by the Zaxis website. It is never stored after pairing.</div>
+            </div>
+            <div class="field">
+              <label>Device ID</label>
+              <input class="input" value="${esc(conn.deviceId||'Creating device ID…')}" disabled>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:14px">
+            <button class="btn primary" onclick="connectZaxis()">Connect to Zaxis</button>
+            <button class="btn" onclick="testZaxisServer()">Test Server</button>
+          </div>
+        `}
+      </div>
+    </div>
+
+    <div>
+      <div class="card panel">
+        <div class="section-head"><div><h2>Resource Limits</h2><p>Saved for worker scheduling</p></div></div>
+        <div class="field"><label>Maximum CPU target</label><select class="select" onchange="saveSetting('cpuLimit',Number(this.value))"><option ${state.settings.cpuLimit===25?'selected':''}>25</option><option ${state.settings.cpuLimit===50?'selected':''}>50</option><option ${state.settings.cpuLimit===75?'selected':''}>75</option><option ${state.settings.cpuLimit===100?'selected':''}>100</option></select></div>
+        <div class="field" style="margin-top:12px"><label>RAM limit (GB)</label><select class="select" onchange="saveSetting('ramLimitGb',Number(this.value))"><option ${state.settings.ramLimitGb===1?'selected':''}>1</option><option ${state.settings.ramLimitGb===2?'selected':''}>2</option><option ${state.settings.ramLimitGb===4?'selected':''}>4</option><option ${state.settings.ramLimitGb===8?'selected':''}>8</option></select></div>
+        <div class="field" style="margin-top:12px"><label>Concurrent network requests</label><input class="input" type="number" min="1" max="32" value="${state.settings.networkConcurrency}" onchange="saveSetting('networkConcurrency',Number(this.value))"></div>
+        <div class="field" style="margin-top:12px"><label>Live verify timeout (ms)</label><input class="input" type="number" min="2000" max="60000" value="${state.settings.verifyTimeoutMs}" onchange="saveSetting('verifyTimeoutMs',Number(this.value))"></div>
+      </div>
+      <div class="card panel section">
+        <h2 style="margin-top:0">Remote Job Readiness</h2>
+        <div class="notice">
+          Once paired, this desktop app can heartbeat to Zaxis, poll for remote jobs, accept supported jobs, send progress, upload results, and report completion/failure.
+        </div>
+        <div class="metric-list" style="margin-top:12px">
+          <div class="metric"><b>15 sec</b><span>Heartbeat interval</span></div>
+          <div class="metric"><b>8 sec</b><span>Remote job polling</span></div>
+          <div class="metric"><b>Secure</b><span>Windows-encrypted token storage</span></div>
+          <div class="metric"><b>HTTPS</b><span>No inbound laptop port required</span></div>
+        </div>
+      </div>
+      <div class="card panel section">
+        <h2 style="margin-top:0">Local Data</h2>
+        <p class="muted">${esc(state.system.dataPath)}</p>
+        <button class="btn" onclick="openData()">Open Data Folder</button>
+      </div>
+    </div>
+  </div>`;
+}
 
 function jobDetail(){const j=state.jobs.find(x=>x.id===selectedJob);if(!j){setHeader('Job','Job not found');return '<div class="card panel empty">Job not found.</div>'}setHeader(titleType(j.type),j.target);const data=selectedResult,items=data?.items||[];return `<div class="card panel"><div class="section-head"><div><h2>${esc(titleType(j.type))}</h2><p>${esc(j.target)} · ${esc(j.meta?.dataset||j.dataset||'')}</p></div><div class="actions">${['failed','cancelled','interrupted','paused'].includes(j.status)?`<button class="btn" onclick="jobAction('${j.id}','retry')">Retry</button>`:''}${j.status==='running'?`<button class="btn danger" onclick="jobAction('${j.id}','cancel')">Cancel</button>`:''}${data?`<button class="btn" onclick="exportJob('${j.id}')">Export</button>`:''}<button class="btn" onclick="backFromJob()">Back</button></div></div><div class="grid stats" style="grid-template-columns:repeat(4,1fr)">${card('Status',j.status,j.stage)}${card('Progress',(j.progress||0)+'%',j.indeterminate?'Indeterminate':'')}${card('Processed',j.processed||0,j.total?`of ${j.total}`:'')}${card('Results',j.resultsFound||0,j.message||'')}</div>${data?`<div class="section result-view"><table class="table"><thead><tr>${items.length?Object.keys(items[0]).slice(0,7).map(k=>`<th>${esc(k)}</th>`).join(''):'<th>Result</th>'}</tr></thead><tbody>${items.slice(0,1000).map(row=>`<tr>${Object.keys(row).slice(0,7).map(k=>`<td>${esc(typeof row[k]==='object'?JSON.stringify(row[k]):row[k])}</td>`).join('')}</tr>`).join('')||'<tr><td class="empty">No result rows.</td></tr>'}</tbody></table></div>`:`<div class="empty">${j.status==='completed'?'No saved result rows.':'Job is still processing. Results will appear here automatically.'}</div>`}</div>`}
 function render(){if(!state)return;captureCommonCrawlDraft();let html='';if(page==='dashboard')html=dashboard();if(page==='jobs')html=jobs();if(page==='commoncrawl')html=commoncrawl();if(page==='results')html=results();if(page==='logs')html=logs();if(page==='settings')html=settings();if(page==='job')html=jobDetail();$('#content').innerHTML=html;}
@@ -36,7 +138,31 @@ function render(){if(!state)return;captureCommonCrawlDraft();let html='';if(page
 window.nav=nav; window.quickJob=()=>nav('commoncrawl');
 window.createJob=async()=>{captureCommonCrawlDraft();const target=commonCrawlDraft.target.trim(),type=commonCrawlDraft.type,dataset=commonCrawlDraft.dataset;if(!target)return toast('Enter a domain or URL.');try{await window.zaxis.createJob({target,type,dataset,provider:type==='live_verify'?'Live HTTP':'Common Crawl'});commonCrawlDraft.target='';toast('Job queued and worker started.');nav('jobs')}catch(e){toast(e.message)}};
 window.loadDatasets=async(show=false)=>{try{datasets=await window.zaxis.listDatasets();if(show)toast(`Loaded ${datasets.length} datasets.`);render()}catch(e){toast('Could not load datasets: '+e.message)}};
-window.toggleSetting=async(k,v)=>{await window.zaxis.saveSettings({[k]:v});toast('Setting saved.')};window.saveSetting=async(k,v)=>{await window.zaxis.saveSettings({[k]:v});toast('Setting saved.')};window.openData=()=>window.zaxis.openDataFolder();window.clearLogs=async()=>{await window.zaxis.clearLogs();toast('Logs cleared.')};window.exportLogs=async()=>{const p=await window.zaxis.exportLogs();if(p)toast('Logs exported.')};window.exportJob=async id=>{const p=await window.zaxis.exportResult(id);if(p)toast('Results exported.')};
+window.toggleSetting=async(k,v)=>{await window.zaxis.saveSettings({[k]:v});toast('Setting saved.')};
+window.connectZaxis=async()=>{
+  const serverUrl=$('#zaxisServerUrl')?.value.trim();
+  const workerName=$('#zaxisWorkerName')?.value.trim();
+  const pairingCode=$('#zaxisPairingCode')?.value.trim();
+  if(!serverUrl||!workerName||!pairingCode)return toast('Server URL, Worker Name and Pairing Code are required.');
+  try{
+    toast('Connecting to Zaxis…');
+    await window.zaxis.pairZaxis({serverUrl,workerName,pairingCode});
+    state=await window.zaxis.getState();
+    renderTop();render();
+    toast('Connected to Zaxis successfully.');
+  }catch(e){toast('Connection failed: '+e.message)}
+};
+window.testZaxisServer=async()=>{
+  const serverUrl=$('#zaxisServerUrl')?.value.trim();
+  if(!serverUrl)return toast('Enter the Zaxis Server URL.');
+  try{const r=await window.zaxis.testZaxis(serverUrl);toast(r.message||'Server is reachable.')}catch(e){toast('Server test failed: '+e.message)}
+};
+window.testZaxisConnection=async()=>{
+  try{const r=await window.zaxis.testZaxis(state.connection?.serverUrl);toast(r.message||'Connection is healthy.')}catch(e){toast('Connection test failed: '+e.message)}
+};
+window.disconnectZaxis=async()=>{
+  try{await window.zaxis.disconnectZaxis();state=await window.zaxis.getState();renderTop();render();toast('Zaxis worker disconnected.')}catch(e){toast(e.message)}
+};window.saveSetting=async(k,v)=>{await window.zaxis.saveSettings({[k]:v});toast('Setting saved.')};window.openData=()=>window.zaxis.openDataFolder();window.clearLogs=async()=>{await window.zaxis.clearLogs();toast('Logs cleared.')};window.exportLogs=async()=>{const p=await window.zaxis.exportLogs();if(p)toast('Logs exported.')};window.exportJob=async id=>{const p=await window.zaxis.exportResult(id);if(p)toast('Results exported.')};
 window.openJob=async id=>{captureCommonCrawlDraft();jobBackPage=page==='results'?'results':'jobs';selectedJob=id;selectedResult=null;page='job';try{selectedResult=await window.zaxis.getResult(id)}catch{}render()};
 window.backFromJob=()=>{selectedJob=null;selectedResult=null;nav(jobBackPage)};
 window.jobAction=async(id,a)=>{await window.zaxis.jobAction(id,a);toast(a==='retry'?'Job re-queued.':'Job updated.');nav('jobs')};
