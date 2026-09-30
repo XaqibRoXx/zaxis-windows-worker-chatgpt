@@ -1,0 +1,9 @@
+{
+  "name": "zaxis-worker",
+  "version": "1.0.0",
+  "description": "Zaxis Worker - Local Web Intelligence Worker",
+  "main": "app/main.js",
+  "author": "ZaxisMedia",
+  "license": "UNLICENSED",
+  "private": true
+}
