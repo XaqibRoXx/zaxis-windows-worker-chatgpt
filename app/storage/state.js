@@ -38,6 +38,17 @@ class StateStore {
       jobs: [],
       logs: [],
       stats: { completedJobs: 0, failedJobs: 0, networkDownBytes: 0, networkUpBytes: 0 },
+      connection: {
+        serverUrl: '',
+        workerName: '',
+        deviceId: '',
+        workerId: '',
+        tokenCipher: '',
+        status: 'disconnected',
+        lastHeartbeat: null,
+        lastError: '',
+        pairedAt: null
+      },
       app: { firstRun: true }
     };
   }
@@ -52,6 +63,7 @@ class StateStore {
         ...parsed,
         settings: { ...base.settings, ...(parsed.settings || {}) },
         stats: { ...base.stats, ...(parsed.stats || {}) },
+        connection: { ...base.connection, ...(parsed.connection || {}) },
         jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
         logs: Array.isArray(parsed.logs) ? parsed.logs : []
       };
@@ -68,6 +80,19 @@ class StateStore {
 
   getState() { return this.state; }
   getSettings() { return this.state.settings; }
+  getConnection() { return this.state.connection; }
+  updateConnection(patch) {
+    this.state.connection = { ...this.state.connection, ...patch };
+    this.save();
+    return this.state.connection;
+  }
+  clearConnection() {
+    const keepDeviceId = this.state.connection?.deviceId || '';
+    const keepWorkerName = this.state.connection?.workerName || '';
+    this.state.connection = { ...this.defaults().connection, deviceId: keepDeviceId, workerName: keepWorkerName };
+    this.save();
+    return this.state.connection;
+  }
   updateSettings(patch) {
     this.state.settings = { ...this.state.settings, ...patch };
     this.save();
