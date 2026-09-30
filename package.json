@@ -1,6 +1,6 @@
 {
   "name": "zaxis-worker",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Zaxis Worker - Local Web Intelligence Worker",
   "main": "app/main.js",
   "author": "ZaxisMedia",
