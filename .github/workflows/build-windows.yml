@@ -2,22 +2,38 @@ name: Build Windows
 on:
   workflow_dispatch:
   push:
+    branches: ['main']
     tags: ['v*']
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Run core tests
+        run: |
+          node --check app/main.js
+          node --check app/preload.js
+          node --check app/worker-engine.js
+          node --check app/providers/commoncrawl.js
+          node --check app/providers/verifier.js
+          node build/test-core.js
+          node build/test-provider.js
+
       - name: Install Electron and packager
         run: npm install --save-dev electron@44.4.5 @electron/packager@19.0.1
+
       - name: Package Windows x64
         shell: pwsh
         run: |
           npx electron-packager . "Zaxis Worker" --platform=win32 --arch=x64 --electron-version=44.4.5 --out=dist --overwrite --asar
           Compress-Archive -Path "dist/Zaxis Worker-win32-x64/*" -DestinationPath "dist/Zaxis-Worker-v1.0.0-Windows-x64-Portable.zip"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
