@@ -11,8 +11,13 @@ function normalizeTarget(target) {
   return u;
 }
 
-async function fetchText(url, timeoutMs = 20000, onBytes = () => {}) {
+async function fetchText(url, timeoutMs = 20000, onBytes = () => {}, externalSignal = null) {
   const controller = new AbortController();
+  const abortFromOutside = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', abortFromOutside, { once:true });
+  }
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'ZaxisWorker/1.0 (+local web intelligence)' } });
@@ -20,17 +25,17 @@ async function fetchText(url, timeoutMs = 20000, onBytes = () => {}) {
     onBytes(Buffer.byteLength(text));
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0,180)}`);
     return text;
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); if (externalSignal) externalSignal.removeEventListener('abort', abortFromOutside); }
 }
 
-async function getCollections(onBytes) {
-  const raw = await fetchText(COLLINFO, 20000, onBytes);
+async function getCollections(onBytes, signal = null) {
+  const raw = await fetchText(COLLINFO, 20000, onBytes, signal);
   const list = JSON.parse(raw);
   return list.map(x => ({ id: x.id, name: x.name, index: x['cdx-api'], timegate: x.timegate })).filter(x => x.id && x.index);
 }
 
-async function resolveCollection(dataset, onBytes) {
-  const collections = await getCollections(onBytes);
+async function resolveCollection(dataset, onBytes, signal = null) {
+  const collections = await getCollections(onBytes, signal);
   if (!collections.length) throw new Error('Common Crawl returned no collections.');
   if (!dataset || dataset === 'latest') return collections[0];
   return collections.find(c => c.id === dataset) || collections[0];
@@ -45,7 +50,7 @@ function parseNdjson(raw) {
 async function captureLookup({ target, dataset = 'latest', limit = 500, onProgress = () => {}, onBytes = () => {}, signal }) {
   const u = normalizeTarget(target);
   onProgress({ stage: 'Loading Common Crawl datasets', progress: 8, processed: 0, total: null });
-  const collection = await resolveCollection(dataset, onBytes);
+  const collection = await resolveCollection(dataset, onBytes, signal);
   if (signal?.aborted) throw new Error('Cancelled');
 
   const domainPattern = `${u.hostname}/*`;
@@ -57,7 +62,7 @@ async function captureLookup({ target, dataset = 'latest', limit = 500, onProgre
   api.searchParams.set('limit', String(Math.min(Math.max(limit, 1), 5000)));
 
   onProgress({ stage: 'Querying crawl index', progress: 20, processed: 0, total: null, meta: { dataset: collection.id } });
-  const raw = await fetchText(api.toString(), 30000, onBytes);
+  const raw = await fetchText(api.toString(), 30000, onBytes, signal);
   if (signal?.aborted) throw new Error('Cancelled');
   const rows = parseNdjson(raw);
   const total = rows.length;
@@ -84,13 +89,13 @@ async function captureLookup({ target, dataset = 'latest', limit = 500, onProgre
 
 async function urlHistory({ target, dataset = 'latest', limit = 1000, onProgress = () => {}, onBytes = () => {}, signal }) {
   const u = normalizeTarget(target);
-  const collection = await resolveCollection(dataset, onBytes);
+  const collection = await resolveCollection(dataset, onBytes, signal);
   const api = new URL(collection.index);
   api.searchParams.set('url', u.toString());
   api.searchParams.set('output', 'json');
   api.searchParams.set('limit', String(Math.min(Math.max(limit, 1), 5000)));
   onProgress({ stage: 'Querying URL history', progress: 30, processed: 0, total: null, meta: { dataset: collection.id } });
-  const raw = await fetchText(api.toString(), 30000, onBytes);
+  const raw = await fetchText(api.toString(), 30000, onBytes, signal);
   if (signal?.aborted) throw new Error('Cancelled');
   const rows = parseNdjson(raw).map(r => ({
     url: r.url, timestamp: r.timestamp, status: Number(r.status || 0), mime: r.mime || r['mime-detected'] || '',
